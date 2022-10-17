@@ -3,18 +3,19 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.multioutput import MultiOutputClassifier
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import confusion_matrix
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import joblib
-import numpy as np
 import re
 import sys
 import pandas as pd
 from sqlalchemy import create_engine
 import nltk
-nltk.download(['punkt', 'wordnet', 'averaged_perceptron_tagger'])
+import numpy as np
+# download onetime only
+# nltk.download(['punkt', 'wordnet', 'averaged_perceptron_tagger'])
 
 url_regex = 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
 
@@ -41,9 +42,10 @@ class StartingVerbExtractor(BaseEstimator, TransformerMixin):
 def load_data(database_filepath):
     engine = create_engine(f'sqlite:///{database_filepath}')
     df = pd.read_sql_table('MessageDetail', engine)
-    X = df.message.values
-    y = df.genre.values
-    category_names = df.columns[4:]
+    category_columns = df.columns[4:]
+    X = df.message
+    y = df[category_columns]
+    category_names = list(category_columns)
     return X, y, category_names
 
 
@@ -75,32 +77,38 @@ def build_model():
             ('starting_verb', StartingVerbExtractor())
         ])),
 
-        ('clf', RandomForestClassifier())
+        ('clf', MultiOutputClassifier(RandomForestClassifier()))
     ])
 
     parameters = {
         'features__text_pipeline__vect__ngram_range': ((1, 1), (1, 2)),
-        'clf__n_estimators': [50, 100, 200],
-        'clf__min_samples_split': [2, 3, 4]
+        'features__text_pipeline__vect__max_df': (0.5, 0.75, 1.0),
+        'features__text_pipeline__vect__max_features': (None, 5000, 10000),
+        'clf__estimator__n_estimators': [50, 100, 200],
+        'clf__estimator__min_samples_split': [2, 3, 4]
     }
 
-    cv = GridSearchCV(pipeline, param_grid=parameters)
+    cv = GridSearchCV(pipeline, param_grid=parameters, verbose=1, n_jobs=-1)
 
     return cv
 
 
-def evaluate_model(model, X_test, Y_test, category_names):
+def evaluate_model(model, X_test, y_test, category_names):
     """
     to evalute model
     """
-    pass
+    y_pred = model.predict(X_test)
+    class_report = classification_report(
+        y_test, y_pred, target_names=category_names)
+    print(class_report)
 
 
 def save_model(model, model_filepath):
     """
     to save model
     """
-    joblib.dump(model, model_filepath)
+    with open(model_filepath, 'wb') as file:
+        joblib.dump(model, file)
 
 
 def main():

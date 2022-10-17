@@ -10,14 +10,19 @@ def load_data(messages_filepath, categories_filepath):
     """
     messages = pd.read_csv(messages_filepath)
     categories = pd.read_csv(categories_filepath)
-    df = messages.merge(categories, on='id')
+    df = messages.merge(categories, how='inner', on='id')
+    return df
+
+
+def clean_data(df):
+    """
+    to clean data
+    """
     # create a dataframe of the 36 individual category columns
-    categories = categories.categories.str.split(";", expand=True)
+    categories = df.categories.str.split(";", expand=True)
     # select the first row of the categories dataframe
     row = categories.iloc[1].values
     # use this row to extract a list of new column names for categories.
-    # one way is to apply a lambda function that takes everything
-    # up to the second to last character of each string with slicing
     category_colnames = [category[:-2] for category in row]
     # rename the columns of `categories`
     categories.columns = category_colnames
@@ -28,14 +33,7 @@ def load_data(messages_filepath, categories_filepath):
     df = df.drop('categories', axis=1)
     # concatenate the original dataframe with the new `categories` dataframe
     df = pd.concat([df, categories], axis=1)
-    return df
-
-
-def clean_data(df):
-    """
-    to clean data
-    """
-    # check any of duplicates
+    # drop duplicate
     df.drop_duplicates(subset=['id'], inplace=True)
     return df
 
@@ -43,7 +41,7 @@ def clean_data(df):
 def save_data(df, database_filename):
     """to save data of df to database"""
     engine = create_engine(f'sqlite:///{database_filename}')
-    df.to_sql('MessageDetail', engine, index=False)
+    df.to_sql('MessageDetail', engine, if_exists='replace', index=False)
 
 
 def main():
