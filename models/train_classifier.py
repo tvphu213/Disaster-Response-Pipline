@@ -14,9 +14,8 @@ import sys
 import pandas as pd
 from sqlalchemy import create_engine
 import nltk
-import numpy as np
 # download onetime only
-# nltk.download(['punkt', 'wordnet', 'averaged_perceptron_tagger'])
+nltk.download(['punkt', 'wordnet', 'averaged_perceptron_tagger'])
 
 url_regex = 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
 
@@ -41,16 +40,30 @@ class StartingVerbExtractor(BaseEstimator, TransformerMixin):
 
 
 def load_data(database_filepath):
+    """
+    to load data from database sqlite and extract message df, categories df
+    input: 
+        database_filepath from user's input
+    output: 
+        X - message dataframe 
+        y - categories dataframe
+
+    """
     engine = create_engine(f'sqlite:///{database_filepath}')
     df = pd.read_sql_table('MessageDetail', engine)
     category_columns = df.columns[4:]
     X = df.message
     y = df[category_columns]
-    category_names = list(category_columns)
-    return X, y, category_names
+    return X, y
 
 
 def tokenize(text):
+    """
+    input:
+        text: messages
+    output:
+        cleaned_tokens (list of words): nomalized, tokenzied text 
+    """
     detected_urls = re.findall(url_regex, text)
     for url in detected_urls:
         text = text.replace(url, "urlplaceholder")
@@ -67,6 +80,11 @@ def tokenize(text):
 
 
 def build_model():
+    """
+    to build model 
+    output: 
+        cv - classification model
+    """
     pipeline = Pipeline([
         ('features', FeatureUnion([
 
@@ -82,32 +100,43 @@ def build_model():
     ])
 
     parameters = {
-        # 'features__text_pipeline__vect__ngram_range': ((1, 1), (1, 2)),
-        # 'features__text_pipeline__vect__max_df': (0.5, 0.75, 1.0),
-        # 'features__text_pipeline__vect__max_features': (None, 5000, 10000),
-        # 'clf__estimator__n_estimators': [50, 100, 200],
+        'features__text_pipeline__vect__ngram_range': ((1, 1), (1, 2)),
+        'clf__estimator__n_estimators': [50, 100, 200],
+        'clf__estimator__min_samples_leaf': [2, 4, 8]
         # 'clf__estimator__min_samples_split': [2, 3, 4]
-        'clf__estimator__min_samples_split': [2]
     }
 
-    cv = GridSearchCV(pipeline, param_grid=parameters, verbose=1, n_jobs=8)
-
+    cv = GridSearchCV(pipeline, param_grid=parameters, n_jobs=8, verbose=2)
     return cv
 
 
-def evaluate_model(model, X_test, y_test, category_names):
+def evaluate_model(model, X_test, y_test):
     """
-    to evalute model
+    input:
+        model
+        X_test: message df of test set
+        y_test: category df of test set
+    output: print out 3 metric below for each category of test set 
+        f1 score 
+        precision
+        recall 
     """
     y_pred = model.predict(X_test)
-    class_report = classification_report(
-        y_test, y_pred, target_names=category_names)
-    print(class_report)
+    for index, feature in enumerate(y_test):
+        print(f'Feature: {feature}')
+        print(classification_report(y_test[feature], y_pred[:, index]))
+    print(f'\nAccuracy: {(y_pred == y_test.values).mean()}')
+    print(f'\nBest Parameters: {model.best_params_}')
 
 
 def save_model(model, model_filepath):
     """
-    to save model
+    to save trained model
+    input 
+        model: classification model
+        model_filepath: model file's path
+    output:
+        pickle file save inputed path
     """
     with open(model_filepath, 'wb') as file:
         joblib.dump(model, file)
@@ -117,7 +146,7 @@ def main():
     if len(sys.argv) == 3:
         database_filepath, model_filepath = sys.argv[1:]
         print('Loading data...\n    DATABASE: {}'.format(database_filepath))
-        X, Y, category_names = load_data(database_filepath)
+        X, Y = load_data(database_filepath)
         X_train, X_test, Y_train, Y_test = train_test_split(
             X, Y, test_size=0.2)
 
@@ -131,7 +160,7 @@ def main():
         save_model(model, model_filepath)
 
         print('Evaluating model...')
-        evaluate_model(model, X_test, Y_test, category_names)
+        evaluate_model(model, X_test, Y_test)
 
         print('Trained model saved!')
 

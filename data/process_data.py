@@ -28,7 +28,7 @@ def clean_data(df):
     categories.columns = category_colnames
     for column in categories:
         # set each value to be the last character of the string and convert column from string to numeric
-        categories[column] = [int(cell[-2:]) for cell in categories[column]]
+        categories[column] = [int(cell[-1:]) for cell in categories[column]]
     # drop the original categories column from `df`
     df = df.drop('categories', axis=1)
     # concatenate the original dataframe with the new `categories` dataframe
