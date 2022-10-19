@@ -8,7 +8,7 @@ Specifically:
 - Build machine learning pipeline
 - Model evaluation and improvement using gridsearchcv
 
-![Model evalue](/img/model_evalue.png")
+![Model evalue](/img/model_evalue.png)
 
 - Build a web-app using the model to predict the category of the message as well as display analytical graphs using plotly
 
