@@ -11,7 +11,7 @@ import joblib
 from sqlalchemy import create_engine
 import nltk
 # download onetime only
-nltk.download(['punkt', 'wordnet', 'averaged_perceptron_tagger'])
+# nltk.download(['punkt', 'wordnet', 'averaged_perceptron_tagger'])
 
 app = Flask(__name__)
 
@@ -61,29 +61,63 @@ model = joblib.load("../models/classifier.pkl")
 def index():
 
     # extract data needed for visuals
-    # TODO: Below is an example - modify to extract data for your own visuals
-    genre_counts = df.groupby('genre').count()['message']
-    genre_names = list(genre_counts.index)
-
-    # create visuals
-    # TODO: Below is an example - modify to create your own visuals
+    category_list = list(df.columns[4:])
+    category_count = df[category_list].sum(axis=0).reset_index()
+    category_distribute = pd.DataFrame({'category_names':category_list, 'category_count':list(category_count.iloc[:,1])}).sort_values('category_count', ascending=False)
+    
+    category_list_with_genre = list(df.columns[3:])
+    category_list_with_genre = df[category_list_with_genre].groupby('genre').agg({sum}).reset_index()
+    direct_category_distribute = list(category_list_with_genre.iloc[0,1:].reset_index()[0])
+    news_category_distribute = list(category_list_with_genre.iloc[1,1:].reset_index()[1])
+    social_category_distribute = list(category_list_with_genre.iloc[2,1:].reset_index()[2])
     graphs = [
         {
             'data': [
-                Bar(
-                    x=genre_names,
-                    y=genre_counts
+                Bar( 
+                    x=category_distribute.category_names,
+                    y=category_distribute.category_count
                 )
             ],
 
             'layout': {
-                'title': 'Distribution of Message Genres',
+                'title': 'Distribution of Message Categories',
+                'yaxis': {
+                    'title': "Message Count"
+                },
+                'xaxis': {
+                    'title': "Category"
+                }
+            }
+        },
+
+        {
+            'data': [
+                Bar(
+                    x=category_list,
+                    y=direct_category_distribute,
+                    name='direct'
+                ),
+                Bar(
+                    x=category_list,
+                    y=news_category_distribute,
+                    name='news'
+                ),
+                 Bar(
+                    x=category_list,
+                    y=social_category_distribute,
+                    name='social'
+                )
+            ],
+
+            'layout': {
+                'title': 'Categories by Genre',
+                'barmode': 'stack',
                 'yaxis': {
                     'title': "Count"
                 },
                 'xaxis': {
-                    'title': "Genre"
-                }
+                    'title': "Categories"
+                }, 
             }
         }
     ]
