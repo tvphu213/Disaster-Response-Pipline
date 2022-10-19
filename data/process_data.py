@@ -13,6 +13,13 @@ def load_data(messages_filepath, categories_filepath):
     df = messages.merge(categories, how='inner', on='id')
     return df
 
+def binary_convert(value, count):
+    """
+    """
+    if value not in [0,1]:
+        cnt+= 1 
+    return value
+
 
 def clean_data(df):
     """
@@ -29,6 +36,17 @@ def clean_data(df):
     for column in categories:
         # set each value to be the last character of the string and convert column from string to numeric
         categories[column] = [int(cell[-1:]) for cell in categories[column]]
+
+    #binary value check and filter
+    #check distribute of value and value counts
+    for column in categories:
+        print(column)
+        print(categories[column].value_counts())
+    
+    #filter out invalid values
+    for column in categories:
+        categories = categories[categories[column].isin([0,1])]
+
     # drop the original categories column from `df`
     df = df.drop('categories', axis=1)
     # concatenate the original dataframe with the new `categories` dataframe
@@ -36,6 +54,7 @@ def clean_data(df):
     # drop duplicate
     df.drop_duplicates(subset=['id'], inplace=True)
     return df
+
 
 
 def save_data(df, database_filename):
